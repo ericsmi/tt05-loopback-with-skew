@@ -11,12 +11,13 @@
 
 /////////////////////////////////////////////////////////////
 `define BEHAV
+`define LB_DELAY
 /////////////////////////////////////////////////////////////
 // helper modules
 
 module buff2(input I, output Z);
 `ifdef BEHAV
-  assign #1 Z = I;
+  assign `LB_DELAY Z = I;
 `else
   sky130_fd_sc_hd__buf_2 sky130_fd_sc_hd__buf_2(.A(I),.X(Z));
 `endif
@@ -38,19 +39,19 @@ module rdffe(input D,E,CLK,RSTN, output Q);
 	else begin
 	  if (E) FF <= D;
 	end
-  assign #1 Q = FF;
+  assign `LB_DELAY Q = FF;
 endmodule
 
 module dff(input D,CLK, output Q);
   reg FF;
   always @(posedge CLK)
     FF <= D;
-  assign #1 Q = FF;
+  assign `LB_DELAY Q = FF;
 endmodule
 
 module mux8(input [7:0] I, input [2:0] S, output Z);
 `ifdef BEHAV
-  assign #1 Z = S[2] ? 
+  assign `LB_DELAY Z = S[2] ? 
       ( S[1] ? ( S[0] ? I[7] : I[6] ) : ( S[0] ? I[5] : I[4] ) ): 
       ( S[1] ? ( S[0] ? I[3] : I[2] ) : ( S[0] ? I[1] : I[0] ) );
 `else
