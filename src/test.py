@@ -11,36 +11,54 @@ async def test_loopback_ericsmi(dut):
     clock = Clock(dut.clk, 10, units="us")
     cocotb.start_soon(clock.start())
 
-    # reset
+    # Initial condition from MUX, tile not selected
     dut.ui_in.value = 0
     dut.uio_in.value = 0
     dut._log.info("reset")
     dut.rst_n.value = 0
-    # set the compare value
-    await ClockCycles(dut.clk, 2)
+    dut.ena.value = 0
 
-    # Test the default loopback, which works in reset
+     # Clear X to make cocotb happy 
+
+    dut.rst_n.value = 1
+    await ClockCycles(dut.clk, 1)
+    dut.rst_n.value = 0
+
+    await ClockCycles(dut.clk, 1)
+    assert 0x80 & dut.uo_out.value == 0x00
+
+    # Select this tile
+
+    dut.ena.value = 1  
+    await ClockCycles(dut.clk, 1)
+    assert 0x80 & dut.uo_out.value == 0x80
+
+    dut.rst_n.value = 1
+    await ClockCycles(dut.clk, 1)
+    assert 0x80 & (dut.uo_out.value) == 0x00
 
     dut.ui_in.value = 0xF0
     await ClockCycles(dut.clk, 1)
-    assert 0x80 & int(dut.uo_out.value) == 0x80
+    assert 0x80 & (dut.uo_out.value) == 0x80
+
     dut.ui_in.value = 0xE0
     await ClockCycles(dut.clk, 1)
-    assert 0x80 & int(dut.uo_out.value) == 0x00
+    assert 0x80 & (dut.uo_out.value) == 0x00
 
-    dut._log.info("PASS: &ui_in[7:4]")
+    dut._log.info("PASS: buffer ena and &ui_in[7:4]")
 
-    for i in range(4):
-        dut.ui_in.value = i
-        await ClockCycles(dut.clk, 1)
-        v = int(dut.uo_out.value)
-        for j in range(7):
-            assert 0x1 & v == 0x1 & i
-            v >>= 1
+    for k in range(2):
+        # default behavior ignores rst_n
+        dut.rst_n.value = k
+        for i in range(4):
+            dut.ui_in.value = i
+            await ClockCycles(dut.clk, 1)
+            v = int(dut.uo_out.value)
+            for j in range(7):
+                assert 0x1 & v == 0x1 & i
+                v >>= 1
 
     dut._log.info("PASS: buffer i[0]")
-
-    dut.rst_n.value = 1
 
     for i in range(8):
         for j in range(8):
@@ -75,3 +93,24 @@ async def test_loopback_ericsmi(dut):
         assert i >> 1 == 0x1 & int(dut.uo_out.value)
 
     dut._log.info("PASS: Bypass Mode")
+    
+    dut.ui_in.value = 0xF0 # turn on jitter flop
+    await ClockCycles(dut.clk, 1)
+    
+    prev = int(dut.uo_out.value) >> 5
+    await ClockCycles(dut.clk, 1)
+    next = int(dut.uo_out.value) >> 5
+
+    assert prev != next 
+
+    dut.ui_in.value = 0xE0 # turn off jitter flop
+    await ClockCycles(dut.clk, 1)
+
+    prev = int(dut.uo_out.value) >> 5
+    await ClockCycles(dut.clk, 1)
+    next = int(dut.uo_out.value) >> 5
+
+    assert prev == next 
+
+    dut._log.info("PASS: clk div2")
+

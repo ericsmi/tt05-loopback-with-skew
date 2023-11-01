@@ -1,7 +1,11 @@
 /*
  * tt_um_loopback_ericsmi.v
  *
- * Loopback test user module, with basic skew measurement
+ * Loopback test user module, with basic skew measurement,
+ * and clock jitter measurement flop
+ *
+ * Extended from:
+ * https://github.com/TinyTapeout/tt05-loopback
  *
  * Author: Eric Smith
  */
@@ -88,26 +92,43 @@ module tt_um_loopback_ericsmi (
     wire [7:0] ui_inb; // for internal use, avoid loading measurement
     wire [7:0] ui_inc; // for measurement
 
-    wire en,D,mCLK,Q,Qbypassed;
+    wire rst_n_a, rst_n_b, rst_n_c;
+
+    wire en,D,mCLK,Q,Qbypassed,Qj;
 
     wire default_mode_n; // when 0, match the behavior of tt05-loopback
     wire bypass;
 
     reg [3:0] clk_div;
 
+    split split_rst_n (
+        .I(rst_n),
+        .A(rst_n_a), 
+        .B(rst_n_b),
+        .C(rst_n_c) 
+    );
+
     split split_ui_in [7:0] (
         .I(ui_in[7:0]),
         .A(ui_ina[7:0]), 
-	.B(ui_inb[7:0]),
-	.C(ui_inc[7:0]) 
+        .B(ui_inb[7:0]),
+        .C(ui_inc[7:0]) 
     );
 
     rdffe rdffe_uio [7:0] (
         .D(uio_in[7:0]),
-	.E({8{en}}),
+        .E({8{en}}),
         .CLK(clk),
-	.RSTN({8{rst_n}}),
-	.Q(uio_out[7:0])
+        .RSTN({8{rst_n_a}}),
+        .Q(uio_out[7:0])
+    );
+
+    rdffe rdffe_jitter (
+        .D(~Qj),
+      	.E(en & default_mode_n),
+        .CLK(clk),
+	      .RSTN(rst_n_b),
+	      .Q(Qj)
     );
 
     assign bypass = uio_out[7];
@@ -116,9 +137,15 @@ module tt_um_loopback_ericsmi (
     assign en = &ui_inb[7:4];
     assign uio_oe[7:0] = {8{~en}};
 
-    assign uo_out[5:0] = default_mode_n ? {6{Qbypassed}} : {6{ui_inb[0]}};
+    assign uo_out[4:0] = default_mode_n ? {5{Qbypassed}} : {5{ui_inb[0]}};
+    assign uo_out[5] = default_mode_n ? Qj : ui_inb[0]; 
     assign uo_out[6] = ui_inb[0];  // same as tt05-loopback
-    assign uo_out[7] = en; // same as tt05-loopback
+
+    // connectivity for all inputs
+    // technically ena should always be high, so force en=0 then toggle rst_n
+    // this should make an ok RTT for rst_n possible
+
+    assign uo_out[7] = rst_n_c ? en : ena; 
 
     // This structure does its best to keep in-tile skew the same.
     // I can't account for PnR on TT but the buffers should dominate the delay
@@ -136,7 +163,7 @@ module tt_um_loopback_ericsmi (
     //   The amount of delay adjust needed on outside of the IC to make 
     //   Q toggle is the amount of skew in path from IC input pin to tile input pin. 
 
-    dff dff( .D(D), .CLK(mCLK), .Q(Q)); 
+    dff dff( .D(D), .CLK(mCLK), .Q(Q));
 
     assign Qbypassed = bypass ? D : Q;
 
