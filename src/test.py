@@ -70,11 +70,14 @@ async def test_loopback_ericsmi(dut):
                 await ClockCycles(dut.clk, 1)
                 assert dut.uio_in.value == dut.uio_out.value
                 for k in range(2):
-                    dut.ui_in.value = k << i
-                    await ClockCycles(dut.clk, 1)
+                    dut.ui_in.value = k << i # assign D
+                    await ClockCycles(dut.clk, 1) # make posedge
                     dut.ui_in.value = (k << i)|(1<<j)
                     await ClockCycles(dut.clk, 1)
+                    dut.ui_in.value = k << i # make negedge
+                    await ClockCycles(dut.clk, 1)
                     assert k == 0x1 & int(dut.uo_out.value)
+                    assert k == 0x1 & (int(dut.uo_out.value) >>4)
 
     dut._log.info("PASS: Race Bits")
 
@@ -96,7 +99,7 @@ async def test_loopback_ericsmi(dut):
     
     dut.ui_in.value = 0xF0 # turn on jitter flop
     await ClockCycles(dut.clk, 1)
-    
+
     prev = int(dut.uo_out.value) >> 5
     await ClockCycles(dut.clk, 1)
     next = int(dut.uo_out.value) >> 5

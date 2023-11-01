@@ -94,7 +94,7 @@ module tt_um_loopback_ericsmi (
 
     wire rst_n_a, rst_n_b, rst_n_c;
 
-    wire en,D,mCLK,Q,Qbypassed,Qj;
+    wire en,D,mCLK,Qp,Qp_bypassed,Qn,Qn_bypassed,Qj;
 
     wire default_mode_n; // when 0, match the behavior of tt05-loopback
     wire bypass;
@@ -137,7 +137,8 @@ module tt_um_loopback_ericsmi (
     assign en = &ui_inb[7:4];
     assign uio_oe[7:0] = {8{~en}};
 
-    assign uo_out[4:0] = default_mode_n ? {5{Qbypassed}} : {5{ui_inb[0]}};
+    assign uo_out[3:0] = default_mode_n ? {4{Qp_bypassed}} : {4{ui_inb[0]}};
+    assign uo_out[4] = default_mode_n ? Qn_bypassed : ui_inb[0];
     assign uo_out[5] = default_mode_n ? Qj : ui_inb[0]; 
     assign uo_out[6] = ui_inb[0];  // same as tt05-loopback
 
@@ -163,8 +164,10 @@ module tt_um_loopback_ericsmi (
     //   The amount of delay adjust needed on outside of the IC to make 
     //   Q toggle is the amount of skew in path from IC input pin to tile input pin. 
 
-    dff dff( .D(D), .CLK(mCLK), .Q(Q));
+    dff dffp( .D(D), .CLK(mCLK), .Q(Qp));  // test arrival of posedge
+    dff dffn( .D(D), .CLK(~mCLK), .Q(Qn)); // test arrival of negedge
 
-    assign Qbypassed = bypass ? D : Q;
+    assign Qp_bypassed = bypass ? D : Qp;
+    assign Qn_bypassed = bypass ? D : Qn;
 
 endmodule // tt_um_loopback
